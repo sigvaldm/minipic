@@ -26,9 +26,6 @@ pos = np.linspace(0, Ng, Np, endpoint=False)
 pos = pos + 0.01*np.cos(2*np.pi*pos/Ng)
 pos %= Ng
 
-plt.hist(pos, bins=Ng)
-plt.show()
-
 vel = np.zeros(pos.shape) # cold
 # vel = velTh * np.random.randn(Np) + velDrift # warm
 
@@ -40,11 +37,6 @@ rho = (q/dx)*mp.distr(pos, Ng)
 phi = solver.solve(rho)
 E = -mp.grad(phi, dx)
 
-plt.plot(rho-np.average(rho), label='rho')
-plt.plot(phi, label='phi')
-plt.plot(E, label='E')
-plt.legend(loc="lower right")
-plt.show()
 #
 a = E*(q/m)*(dt**2/dx)
 mp.accel(pos, vel, 0.5*a)
@@ -62,7 +54,7 @@ for n in range(1,Nt):
     phi = solver.solve(rho)
     E = -mp.grad(phi, dx)
     a = E*(q/m)*(dt**2/dx)
-    KE[n] = m*mp.accel(pos, vel, a)
+    KE[n] = (dx/dt)**2*m*mp.accel(pos, vel, a)
     rho -= np.average(rho)
     PE[n] = 0.5*dx*sum(rho*phi)
 
