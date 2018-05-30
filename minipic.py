@@ -34,12 +34,33 @@ def grad(phi, dx):
     return E
 
 def accel(x, v, a):
+    "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
     N = len(a)
     j = x.astype(int)
     ai = a[j] + (x-j)*(a[(j+1)%N] - a[j])
     energy = 0.5*sum(v*(v+ai))
     v += ai
     return energy
+
+
+def accel_accurate_energy(x, vb, vc, a):
+    """
+    Error O(dt^3) in pos, vel and energy
+    va - v at (n+0.5)
+    vb - v at (n-0.5)
+    vc - v at (n-1.5)
+    vn - v at n
+    """
+
+    N = len(a)
+    j = x.astype(int)
+    ai = a[j] + (x-j)*(a[(j+1)%N] - a[j])
+
+    va = vb + ai
+    vn = (3/8)*va + (3/4)*vb - (1/8)*vc
+    energy = 0.5*sum(vn**2)
+
+    return energy, va, vb
 
 def move(x, v, L):
     x += v
