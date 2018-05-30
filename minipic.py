@@ -1,6 +1,28 @@
 from __future__ import print_function, division
 import numpy as np
 import matplotlib.pylab as plt
+import cmath
+from numpy.fft import fftfreq, fft, rfft, ifft, irfft
+
+class PoissonSolver(object):
+
+    def __init__(self, Ng):
+        k = fftfreq(Ng, 1./Ng)
+        k2 = k*k
+        K_sq_inv = 1.0 / np.where(k2 == 0, 1, k2).astype(float)
+
+        self.k, self.K_sq_inv = k, K_sq_inv
+
+    def solve(self, rho):
+        spectrum = fft(rho)
+        spectrum *= self.K_sq_inv
+        phi = ifft(spectrum)
+        return phi.real
+
+    def grad(self, phi):
+        E_hat = -1j*self.k*fft(phi)
+        E = ifft(E_hat)
+        return E.real
 
 class Solver(object):
 

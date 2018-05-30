@@ -7,6 +7,8 @@ import copy
 " INITIAL CONDITIONS
 """
 
+spectral_grad = True
+
 dts = [2**(-n) for n in range(15)]
 
 errors = []
@@ -24,7 +26,11 @@ for dt in dts:
     mul = (L/Np)*(m/q**2)
     q *= mul
     m *= mul
-    solver = mp.Solver(Ng, dx, True)
+
+    if spectral_grad:
+        solver = mp.PoissonSolver(Ng)
+    else:
+        solver = mp.Solver(Ng, dx, False)
 
     pos = np.linspace(0, Ng, Np, endpoint=False)
     # pos = np.random.uniform(0, Ng, Np)
@@ -41,9 +47,11 @@ for dt in dts:
 
     rho = (q/dx)*mp.distr(pos, Ng)
     phi = solver.solve(rho)
-    E = -mp.grad(phi, dx)
+    if spectral_grad:
+        E = solver.grad(phi)
+    else:
+        E = -mp.grad(phi, dx)
 
-    #
     a = E*(q/m)*(dt**2/dx)
     mp.accel(pos, vel, 0.5*a)
     rho -= np.average(rho)
@@ -58,7 +66,11 @@ for dt in dts:
         mp.move(pos, vel, Ng)
         rho = (q/dx)*mp.distr(pos, Ng)
         phi = solver.solve(rho)
-        E = -mp.grad(phi, dx)
+        if spectral_grad:
+            E = solver.grad(phi)
+        else:
+            E = -mp.grad(phi, dx)
+
         a = E*(q/m)*(dt**2/dx)
         # KE[n] = (dx/dt)**2*m*mp.accel(pos, vel, a)
         KEn, vel, velold = mp.accel_accurate_energy(pos, vel, velold, a)
