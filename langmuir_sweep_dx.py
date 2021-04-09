@@ -7,14 +7,15 @@ import copy
 " INITIAL CONDITIONS
 """
 
-Ngs = [2**n for n in range(2,14)]
+Ngs = [2**n for n in range(2,16)]
 
 errors = []
 dxs = []
 for Ng in Ngs:
-    Np = Ng*8
+    print("Ng={}".format(Ng))
+    Np = Ng*2
 
-    Nt = 150
+    Nt = 500
     dt = 0.001
     L = 2*np.pi
     dx = L/Ng
@@ -65,7 +66,9 @@ for Ng in Ngs:
         KEn, vel, velold = mp.accel_accurate_energy(pos, vel, velold, a)
         KE[n] = (dx/dt)**2*m*KEn
         rho -= np.average(rho)
-        PE[n] = 0.5*dx*sum(rho*phi)
+        # PE[n] = 0.5*dx*sum(rho*phi)
+        # PE[n] = 0.5*dx*sum(E**2)
+        PE[n] = mp.potential_energy(pos, phi, q)
 
 
     TE = KE + PE
@@ -77,7 +80,9 @@ for Ng in Ngs:
     # plt.legend(loc='lower right')
     # plt.show()
 
-    error = np.max(np.abs(TE-TE[0]))/TE[0]
+    offset = int(len(TE)/2)
+    offset = 0
+    error = np.max(np.abs(TE[offset:]-TE[offset]))/TE[offset]
     errors.append(error)
 
     # plt.plot(rho, label='rho')

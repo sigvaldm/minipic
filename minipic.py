@@ -62,6 +62,18 @@ def accel_accurate_energy(x, vb, vc, a):
 
     return energy, va, vb
 
+# Potential energy from particles
+# Faster field computations:
+#   0.5*dx*sum(rho*phi)
+#   0.5*dx*sum(E**2)
+def potential_energy(x, phi, q):
+
+    N = len(phi)
+    j = x.astype(int)
+    phi_i = phi[j] + (x-j)*(phi[(j+1)%N] - phi[j])
+    energy = 0.5*q*sum(phi_i)
+    return energy
+
 def move(x, v, L):
     x += v
     x %= L
