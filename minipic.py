@@ -1,6 +1,14 @@
 import numpy as np
 import matplotlib.pylab as plt
 
+def make_grid(domain_size, num_cells, sparse=False):
+
+    axes = []
+    for l, n in zip(domain_size, num_cells):
+        axes.append(np.linspace(0, l, n, endpoint=False))
+
+    return np.meshgrid(*axes, indexing='ij', sparse=sparse)
+
 class Solver:
 
     def __init__(self, Ng, dx, finite_difference=False):
@@ -9,76 +17,19 @@ class Solver:
         L = dx*Ng
 
         kdx = 2*np.pi/L
-        # Ngd = (Ng//2+1)*kdx
-        # Ngd = Ng*kdx
-        Ngd = Ng*1.1/1.1
-        Ngd[-1] = Ngd[-1]//2+1
+        Ng[-1] = Ng[-1]//2+1
         kdx[0:-1] /= np.sqrt(2) # Why the fuck must this be here?
-        Ngd *= kdx
-        # print(kdx, Ngd)
 
-        if len(Ng)==1:
-            ks = np.mgrid[0:Ngd[0]:kdx[0]]
-        elif len(Ng)==2:
-            ks = np.mgrid[0:Ngd[0]:kdx[0], 0:Ngd[1]:kdx[1]]
-
-            kx, ky = ks
-            print(kx[:,0])
-            print(ky[0,:])
-
-            ks = np.sqrt(ks[0]**2+ks[1]**2)
-            print(ks)
-        else:
-            ks = np.mgrid[0:Ngd[0]:kdx[0], 0:Ngd[1]:kdx[1], 0:Ngd[2]:kdx[2]]
-            ks = np.sqrt(ks[0]**2+ks[1]**2+ks[2]**2)
-
-
-        # ks = ks[0]
-
-
-        # ks = np.sqrt(ks[0]**2)
-        # ks = np.sqrt(ks[0]**2)
-        # ks[0] *= 2*np.pi/L[0]
-        # ks[1] *= 2*np.pi/L[1]
-
-        # ks = 0
-        # for n,l in zip(Ng, L):
-        #     ks += (2*np.pi/l)*np.arange(n//2+1)
-        #     print(ks)
-
-        # if len(Ng)==1:
-        #     ks[0] = 
-        # ks[0,0] = 1 # to avoid divide-by-zero
-
-        # print(ks**(-2))
+        ks = make_grid(Ng*kdx, Ng)
+        ks = np.sqrt(sum([a**2 for a in ks]))
 
         self.K_sq_inv = ks**(-2)
-        print(self.K_sq_inv**(-0.5))
-
-        # if not finite_difference:
-        #     self.K_sq_inv = ks**(-2)
-        # else:
-        #     arg = 0.5*dx*ks
-        #     self.K_sq_inv = (ks*np.sin(arg)/arg)**(-2)
-
-        if len(Ng)==1:
-            self.K_sq_inv[0] = 0
-        elif len(Ng)==2:
-            self.K_sq_inv[0,0] = 0 # Quasi-neutrality
-        else:
-            self.K_sq_inv[0,0,0] = 0
-        # self.K_sq_inv[:] = 1
+        self.K_sq_inv.ravel()[0] = 0 # Quasi-neutrality
 
     def solve(self, rho):
-        # plt.plot(rho[0,:]); plt.show()
-        spectrum = np.fft.rfftn(rho, rho.shape, norm="ortho")
-        # plt.plot(np.abs(spectrum[0,:])); plt.show()
-        # spectrum = np.fft.fftn(rho)
-        print(self.K_sq_inv)
+        spectrum = np.fft.rfftn(rho)
         spectrum *= self.K_sq_inv
-        phi = np.fft.irfftn(spectrum, rho.shape, norm="ortho")
-        # phi = np.fft.ifftn(spectrum, rho.shape)
-        # print(rho.shape, spectrum.shape, self.K_sq_inv.shape, phi.shape)
+        phi = np.fft.irfftn(spectrum, rho.shape)
         return phi
 
 def grad(phi, dx):
