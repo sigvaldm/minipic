@@ -42,14 +42,14 @@ KE_e = np.zeros(Nt)
 KE_e[0] = 0.5*me*sum(vel_e**2)
 KE_i[0] = 0.5*mi*sum(vel_i**2)
 
-rho = (qe/dx)*mp.distr(pos_e, Ng) + (qi/dx)*mp.distr(pos_i, Ng)
+rho = (qe/dx)*mp.nb_distr(pos_e, Ng) + (qi/dx)*mp.nb_distr(pos_i, Ng)
 phi = solver.solve(rho)
 E = -mp.grad(phi, dx)
 
 #
 a = E*(dt**2/dx)
-mp.accel(pos_e, vel_e, 0.5*(qe/me)*a)
-mp.accel(pos_i, vel_i, 0.5*(qi/mi)*a)
+mp.nb_accel(pos_e, vel_e, 0.5*(qe/me)*a)
+mp.nb_accel(pos_i, vel_i, 0.5*(qi/mi)*a)
 # rho -= np.average(rho)
 PE[0] = 0.5*dx*sum(rho*phi)
 
@@ -62,11 +62,11 @@ timer = TaskTimer()
 for n in timer.iterate(range(1,Nt)):
 
     timer.task('Move')
-    mp.move(pos_e, vel_e, Ng)
-    mp.move(pos_i, vel_i, Ng)
+    mp.nb_move(pos_e, vel_e, Ng)
+    mp.nb_move(pos_i, vel_i, Ng)
 
     timer.task('Distribute')
-    rho = (qe/dx)*mp.distr(pos_e, Ng) + (qi/dx)*mp.distr(pos_i, Ng)
+    rho = (qe/dx)*mp.nb_distr(pos_e, Ng) + (qi/dx)*mp.nb_distr(pos_i, Ng)
 
     timer.task('Solve phi')
     phi = solver.solve(rho)
@@ -76,8 +76,8 @@ for n in timer.iterate(range(1,Nt)):
 
     timer.task('Accelerate')
     a = E*(dt**2/dx)
-    KE_e[n] = (dx/dt)**2*me*mp.accel(pos_e, vel_e, (qe/me)*a)
-    KE_i[n] = (dx/dt)**2*mi*mp.accel(pos_i, vel_i, (qi/mi)*a)
+    KE_e[n] = (dx/dt)**2*me*mp.nb_accel(pos_e, vel_e, (qe/me)*a)
+    KE_i[n] = (dx/dt)**2*mi*mp.nb_accel(pos_i, vel_i, (qi/mi)*a)
     # rho -= np.average(rho)
 
     timer.task('Potential energy')

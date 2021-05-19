@@ -1,6 +1,9 @@
 from __future__ import print_function, division
 import numpy as np
 import matplotlib.pylab as plt
+import numba as nb
+
+parallel=False
 
 class Solver(object):
 
@@ -41,6 +44,22 @@ def accel(x, v, a):
     v += ai
     return energy
 
+@nb.njit(fastmath=True, parallel=parallel)
+def nb_accel(xs, vs, a):
+    "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
+    N = len(a)
+    b = np.zeros(N+1)
+    b[:-1] = a
+    b[-1] = a[0]
+    energy = 0.
+    for i in range(len(xs)):
+        x = xs[i]
+        j = int(x)
+        ai = (x-j)*b[j+1] + (1-x+j)*b[j]
+        energy += vs[i]*(vs[i]+ai)
+        vs[i] += ai
+    energy *= 0.5
+    return energy
 
 def accel_accurate_energy(x, vb, vc, a):
     """
@@ -77,8 +96,28 @@ def move(x, v, L):
     x += v
     x %= L
 
+@nb.njit(fastmath=True, parallel=parallel)
+def nb_move(xs, vs, L):
+    for i in nb.prange(len(xs)):
+        xs[i] += vs[i]
+        xs[i] %= L
+    # xs += vs
+    # xs %= L
+
 def distr(x, N):
     j = x.astype(int)
     rho  = np.bincount(j, 1-(x-j))
     rho += np.bincount((j+1)%N, x-j)
     return rho
+
+@nb.njit(fastmath=True, parallel=parallel)
+def nb_distr(xs, N):
+    rho = np.zeros(N+1)
+    for i in nb.prange(len(xs)):
+        x = xs[i]
+    # for x in xs:
+        j = int(x)
+        rho[j] += 1-(x-j)
+        rho[j+1] += x-j
+    rho[0] += rho[-1]
+    return rho[:-1]
