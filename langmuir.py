@@ -1,16 +1,17 @@
 import minipic as mp
 import numpy as np
 import matplotlib.pylab as plt
+from tasktimer import TaskTimer
 
 """
 " INITIAL CONDITIONS
 """
 
-Ng = 1024
-Np = Ng*16
+Ng = 32**3
+Np = Ng*64
 
-Nt = 150
-dt = 0.05
+Nt = 45
+dt = 0.2
 L = 2*np.pi
 dx = L/Ng
 x = np.arange(0,L,dx)
@@ -56,18 +57,33 @@ PE[0] = 0.5*dx*sum(rho*phi)
 " TIME LOOP
 """
 
-for n in range(1,Nt):
+timer = TaskTimer()
 
+for n in timer.iterate(range(1,Nt)):
+
+    timer.task('Move')
     mp.move(pos_e, vel_e, Ng)
     mp.move(pos_i, vel_i, Ng)
+
+    timer.task('Distribute')
     rho = (qe/dx)*mp.distr(pos_e, Ng) + (qi/dx)*mp.distr(pos_i, Ng)
+
+    timer.task('Solve phi')
     phi = solver.solve(rho)
+
+    timer.task('Solve E')
     E = -mp.grad(phi, dx)
+
+    timer.task('Accelerate')
     a = E*(dt**2/dx)
     KE_e[n] = (dx/dt)**2*me*mp.accel(pos_e, vel_e, (qe/me)*a)
     KE_i[n] = (dx/dt)**2*mi*mp.accel(pos_i, vel_i, (qi/mi)*a)
-    rho -= np.average(rho)
+    # rho -= np.average(rho)
+
+    timer.task('Potential energy')
     PE[n] = 0.5*dx*sum(rho*phi)
+
+print(timer)
 
 
 plt.plot(KE_e, label='Kinetic Energy (electrons)')
