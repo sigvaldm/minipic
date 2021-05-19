@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pylab as plt
+from copy import deepcopy
 
 def make_grid(domain_size, num_cells, sparse=False):
 
@@ -13,7 +14,7 @@ class Solver:
 
     def __init__(self, Ng, dx, finite_difference=False):
 
-        self.Ng = Ng
+        Ng = deepcopy(Ng)
         L = dx*Ng
 
         kdx = 2*np.pi/L
@@ -23,6 +24,7 @@ class Solver:
         ks = make_grid(Ng*kdx, Ng)
         ks = np.sqrt(sum([a**2 for a in ks]))
 
+        ks.ravel()[0]=1 # To avoid divide-by-zero
         self.K_sq_inv = ks**(-2)
         self.K_sq_inv.ravel()[0] = 0 # Quasi-neutrality
 
