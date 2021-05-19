@@ -36,9 +36,8 @@ def grad(phi, dx):
 def accel(x, v, a):
     "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
     N = len(a)
-    j = x.astype(int)
-    ai = a[j] + (x-j)*(a[(j+1)%N] - a[j])
-    energy = 0.5*sum(v*(v+ai))
+    ai = np.interp(x, np.arange(N), a, period=N)
+    energy = 0.5*np.sum(v*(v+ai))
     v += ai
     return energy
 

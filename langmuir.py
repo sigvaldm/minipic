@@ -53,11 +53,11 @@ mp.accel(pos_i, vel_i, 0.5*(qi/mi)*a)
 # rho -= np.average(rho)
 PE[0] = 0.5*dx*sum(rho*phi)
 
+timer = TaskTimer()
+
 """
 " TIME LOOP
 """
-
-timer = TaskTimer()
 
 for n in timer.iterate(range(1,Nt)):
 
