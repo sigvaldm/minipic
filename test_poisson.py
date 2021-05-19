@@ -22,15 +22,16 @@ solver = Solver(Ng, dx)
 print(Ng)
 phi = solver.solve(rho)
 
+x_e = np.linspace(0, L[dim-1], 100)
+phi_e = np.sin(k*x_e)
+plt.plot(x_e, phi_e, label='phi exact')
+
 if dim==1:
-    plt.plot(x, phi_e[:], label='phi exact')
-    plt.plot(x, phi[:], '--', label='phi')
+    plt.plot(x, phi[:], 'o', label='phi')
 elif dim==2:
-    plt.plot(x, phi_e[0,:], label='phi exact')
-    plt.plot(x, phi[0,:], '--', label='phi')
+    plt.plot(x, phi[0,:], 'o', label='phi')
 else:
-    plt.plot(x, phi_e[0,:,0], label='phi exact')
-    plt.plot(x, phi[0,:,0], '--', label='phi')
+    plt.plot(x, phi[0,:,0], 'o', label='phi')
 
 plt.legend()
 plt.show()

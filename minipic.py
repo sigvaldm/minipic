@@ -32,12 +32,45 @@ class Solver:
         phi = np.fft.irfftn(spectrum, rho.shape)
         return phi
 
+# def grad(phi, dx):
+#     E = np.zeros(phi.shape)
+#     E[0]    = phi[1]  - phi[-1]
+#     E[1:-1] = phi[2:] - phi[:-2]
+#     E[-1]   = phi[0]  - phi[-2]
+#     E /= 2*dx
+#     return E
+
 def grad(phi, dx):
-    E = np.zeros(phi.shape)
-    E[0]    = phi[1]  - phi[-1]
-    E[1:-1] = phi[2:] - phi[:-2]
-    E[-1]   = phi[0]  - phi[-2]
-    E /= 2*dx
+    if len(phi.shape)==1:
+        E = np.zeros((1,*phi.shape))
+        E[0,0]    = phi[1]  - phi[-1]
+        E[0,1:-1] = phi[2:] - phi[:-2]
+        E[0,-1]   = phi[0]  - phi[-2]
+        E /= 2*dx[0]
+    elif len(phi.shape)==2:
+        E = np.zeros((2,*phi.shape))
+        E[0,0,:]    = phi[1,:]  - phi[-1,:]
+        E[0,1:-1,:] = phi[2:,:] - phi[:-2,:]
+        E[0,-1,:]   = phi[0,:]  - phi[-2,:]
+        E[1,:,0]    = phi[:,1]  - phi[:,-1]
+        E[1,:,1:-1] = phi[:,2:] - phi[:,:-2]
+        E[1,:,-1]   = phi[:,0]  - phi[:,-2]
+        E[0] /= 2*dx[0]
+        E[1] /= 2*dx[1]
+    else:
+        E = np.zeros((3,*phi.shape))
+        E[0,0,:,:]    = phi[1,:,:]  - phi[-1,:,:]
+        E[0,1:-1,:,:] = phi[2:,:,:] - phi[:-2,:,:]
+        E[0,-1,:,:]   = phi[0,:,:]  - phi[-2,:,:]
+        E[1,:,0,:]    = phi[:,1,:]  - phi[:,-1,:]
+        E[1,:,1:-1,:] = phi[:,2:,:] - phi[:,:-2,:]
+        E[1,:,-1,:]   = phi[:,0,:]  - phi[:,-2,:]
+        E[2,:,:,0]    = phi[:,:,1]  - phi[:,:,-1]
+        E[2,:,:,1:-1] = phi[:,:,2:] - phi[:,:,:-2]
+        E[2,:,:,-1]   = phi[:,:,0]  - phi[:,:,-2]
+        E[0] /= 2*dx[0]
+        E[1] /= 2*dx[1]
+        E[2] /= 2*dx[2]
     return E
 
 def accel(x, v, a):
