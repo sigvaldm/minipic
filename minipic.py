@@ -1,39 +1,81 @@
-from __future__ import print_function, division
 import numpy as np
 import matplotlib.pylab as plt
 import numba as nb
+from copy import deepcopy
 
 parallel=False
 
-class Solver(object):
+def make_grid(domain_size, num_cells, sparse=False):
+
+    axes = []
+    for l, n in zip(domain_size, num_cells):
+        axes.append(np.linspace(0, l, n, endpoint=False))
+
+    return np.meshgrid(*axes, indexing='ij', sparse=sparse)
+
+class Solver:
 
     def __init__(self, Ng, dx, finite_difference=False):
-        self.Ng = Ng
+
+        Ng = deepcopy(Ng)
         L = dx*Ng
-        k = np.array([n*2*np.pi/L for n in range(Ng//2+1)])
 
-        k[0] = 1 # to avoid divide-by-zero
+        kdx = 2*np.pi/L
+        Ng[-1] = Ng[-1]//2+1
+        kdx[0:-1] /= np.sqrt(2) # Why the fuck must this be here?
 
-        if not finite_difference:
-            self.K_sq_inv = k**(-2)
-        else:
-            arg = 0.5*dx*k
-            self.K_sq_inv = (k*np.sin(arg)/arg)**(-2)
+        ks = make_grid(Ng*kdx, Ng)
+        ks = np.sqrt(sum([a**2 for a in ks]))
 
-        self.K_sq_inv[0] = 0 # Quasi-neutrality
+        ks.ravel()[0]=1 # To avoid divide-by-zero
+        self.K_sq_inv = ks**(-2)
+        self.K_sq_inv.ravel()[0] = 0 # Quasi-neutrality
 
     def solve(self, rho):
-        spectrum = np.fft.rfft(rho)
+        spectrum = np.fft.rfftn(rho)
         spectrum *= self.K_sq_inv
-        phi = np.fft.irfft(spectrum, self.Ng)
+        phi = np.fft.irfftn(spectrum, rho.shape)
         return phi
 
+# def grad(phi, dx):
+#     E = np.zeros(phi.shape)
+#     E[0]    = phi[1]  - phi[-1]
+#     E[1:-1] = phi[2:] - phi[:-2]
+#     E[-1]   = phi[0]  - phi[-2]
+#     E /= 2*dx
+#     return E
+
 def grad(phi, dx):
-    E = np.zeros(phi.shape)
-    E[0]    = phi[1]  - phi[-1]
-    E[1:-1] = phi[2:] - phi[:-2]
-    E[-1]   = phi[0]  - phi[-2]
-    E /= 2*dx
+    if len(phi.shape)==1:
+        E = np.zeros((1,*phi.shape))
+        E[0,0]    = phi[1]  - phi[-1]
+        E[0,1:-1] = phi[2:] - phi[:-2]
+        E[0,-1]   = phi[0]  - phi[-2]
+        E /= 2*dx[0]
+    elif len(phi.shape)==2:
+        E = np.zeros((2,*phi.shape))
+        E[0,0,:]    = phi[1,:]  - phi[-1,:]
+        E[0,1:-1,:] = phi[2:,:] - phi[:-2,:]
+        E[0,-1,:]   = phi[0,:]  - phi[-2,:]
+        E[1,:,0]    = phi[:,1]  - phi[:,-1]
+        E[1,:,1:-1] = phi[:,2:] - phi[:,:-2]
+        E[1,:,-1]   = phi[:,0]  - phi[:,-2]
+        E[0] /= 2*dx[0]
+        E[1] /= 2*dx[1]
+    else:
+        E = np.zeros((3,*phi.shape))
+        E[0,0,:,:]    = phi[1,:,:]  - phi[-1,:,:]
+        E[0,1:-1,:,:] = phi[2:,:,:] - phi[:-2,:,:]
+        E[0,-1,:,:]   = phi[0,:,:]  - phi[-2,:,:]
+        E[1,:,0,:]    = phi[:,1,:]  - phi[:,-1,:]
+        E[1,:,1:-1,:] = phi[:,2:,:] - phi[:,:-2,:]
+        E[1,:,-1,:]   = phi[:,0,:]  - phi[:,-2,:]
+        E[2,:,:,0]    = phi[:,:,1]  - phi[:,:,-1]
+        E[2,:,:,1:-1] = phi[:,:,2:] - phi[:,:,:-2]
+        E[2,:,:,-1]   = phi[:,:,0]  - phi[:,:,-2]
+        E[0] /= 2*dx[0]
+        E[1] /= 2*dx[1]
+        E[2] /= 2*dx[2]
     return E
 
 def accel(x, v, a):

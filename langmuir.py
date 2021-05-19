@@ -7,30 +7,31 @@ from tasktimer import TaskTimer
 " INITIAL CONDITIONS
 """
 
-Ng = 32**3
-Np = Ng*64
+Ng = np.array([32**3])
+Np = Ng[0]*64
 
 Nt = 45
 dt = 0.2
-L = 2*np.pi
+L = np.array([2*np.pi])
 dx = L/Ng
-x = np.arange(0,L,dx)
+
+x = np.arange(0,L[0],dx[0])
 qe = -1.0
 qi = 1.0
 me = 1.0
 mi = 10.0
-mul = (L/Np)*(me/qe**2)
+mul = (L[0]/Np)*(me/qe**2)
 qe *= mul
 me *= mul
 qi *= mul
 mi *= mul
-solver = mp.Solver(Ng, dx, True)
+solver = mp.Solver(Ng, dx)
 
-pos_e = np.linspace(0, Ng, Np, endpoint=False)
-pos_i = np.linspace(0, Ng, Np, endpoint=False)
+pos_e = np.linspace(0, Ng[0], Np, endpoint=False)
+pos_i = np.linspace(0, Ng[0], Np, endpoint=False)
 # pos = np.random.uniform(0, Ng, Np)
 pos_e = pos_e + 0.01*np.cos(2*np.pi*pos_e/Ng)
-pos_e %= Ng
+pos_e %= Ng[0]
 
 vel_e = np.zeros(pos_e.shape) # cold
 vel_i = np.zeros(pos_i.shape) # cold
@@ -42,9 +43,9 @@ KE_e = np.zeros(Nt)
 KE_e[0] = 0.5*me*sum(vel_e**2)
 KE_i[0] = 0.5*mi*sum(vel_i**2)
 
-rho = (qe/dx)*mp.nb_distr(pos_e, Ng) + (qi/dx)*mp.nb_distr(pos_i, Ng)
+rho = (qe/dx)*mp.nb_distr(pos_e, Ng[0]) + (qi/dx)*mp.nb_distr(pos_i, Ng[0])
 phi = solver.solve(rho)
-E = -mp.grad(phi, dx)
+E = -mp.grad(phi, dx)[0]
 
 #
 a = E*(dt**2/dx)
@@ -53,26 +54,26 @@ mp.nb_accel(pos_i, vel_i, 0.5*(qi/mi)*a)
 # rho -= np.average(rho)
 PE[0] = 0.5*dx*sum(rho*phi)
 
-timer = TaskTimer()
-
 """
 " TIME LOOP
 """
 
+timer = TaskTimer()
+
 for n in timer.iterate(range(1,Nt)):
 
     timer.task('Move')
-    mp.nb_move(pos_e, vel_e, Ng)
-    mp.nb_move(pos_i, vel_i, Ng)
+    mp.nb_move(pos_e, vel_e, Ng[0])
+    mp.nb_move(pos_i, vel_i, Ng[0])
 
     timer.task('Distribute')
-    rho = (qe/dx)*mp.nb_distr(pos_e, Ng) + (qi/dx)*mp.nb_distr(pos_i, Ng)
+    rho = (qe/dx)*mp.nb_distr(pos_e, Ng[0]) + (qi/dx)*mp.nb_distr(pos_i, Ng[0])
 
-    timer.task('Solve phi')
+    timer.task('Poisson-solve')
     phi = solver.solve(rho)
 
-    timer.task('Solve E')
-    E = -mp.grad(phi, dx)
+    timer.task('E-field gradient')
+    E = -mp.grad(phi, dx)[0]
 
     timer.task('Accelerate')
     a = E*(dt**2/dx)
