@@ -1,67 +1,95 @@
 import minipic as mp
 import numpy as np
 import matplotlib.pylab as plt
+from tasktimer import TaskTimer
 
 """
 " INITIAL CONDITIONS
 """
 
-Ng = 32
-Np = Ng*4
+Ng = 32**3
+Np = Ng*64
 
-Nt = 150
+Nt = 45
 dt = 0.2
 L = 2*np.pi
 dx = L/Ng
 x = np.arange(0,L,dx)
-q = -1.0
-m = 1.0
-mul = (L/Np)*(m/q**2)
-q *= mul
-m *= mul
+qe = -1.0
+qi = 1.0
+me = 1.0
+mi = 10.0
+mul = (L/Np)*(me/qe**2)
+qe *= mul
+me *= mul
+qi *= mul
+mi *= mul
 solver = mp.Solver(Ng, dx, True)
 
-pos = np.linspace(0, Ng, Np, endpoint=False)
+pos_e = np.linspace(0, Ng, Np, endpoint=False)
+pos_i = np.linspace(0, Ng, Np, endpoint=False)
 # pos = np.random.uniform(0, Ng, Np)
-pos = pos + 0.01*np.cos(2*np.pi*pos/Ng)
-pos %= Ng
+pos_e = pos_e + 0.01*np.cos(2*np.pi*pos_e/Ng)
+pos_e %= Ng
 
-vel = np.zeros(pos.shape) # cold
+vel_e = np.zeros(pos_e.shape) # cold
+vel_i = np.zeros(pos_i.shape) # cold
 # vel = velTh * np.random.randn(Np) + velDrift # warm
 
-KE = np.zeros(Nt)
 PE = np.zeros(Nt)
-KE[0] = 0.5*m*sum(vel**2)
+KE_i = np.zeros(Nt)
+KE_e = np.zeros(Nt)
+KE_e[0] = 0.5*me*sum(vel_e**2)
+KE_i[0] = 0.5*mi*sum(vel_i**2)
 
-rho = (q/dx)*mp.distr(pos, Ng)
+rho = (qe/dx)*mp.distr(pos_e, Ng) + (qi/dx)*mp.distr(pos_i, Ng)
 phi = solver.solve(rho)
 E = -mp.grad(phi, dx)
 
 #
-a = E*(q/m)*(dt**2/dx)
-mp.accel(pos, vel, 0.5*a)
-rho -= np.average(rho)
+a = E*(dt**2/dx)
+mp.accel(pos_e, vel_e, 0.5*(qe/me)*a)
+mp.accel(pos_i, vel_i, 0.5*(qi/mi)*a)
+# rho -= np.average(rho)
 PE[0] = 0.5*dx*sum(rho*phi)
 
 """
 " TIME LOOP
 """
 
-for n in range(1,Nt):
+timer = TaskTimer()
 
-    mp.move(pos, vel, Ng)
-    rho = (q/dx)*mp.distr(pos, Ng)
+for n in timer.iterate(range(1,Nt)):
+
+    timer.task('Move')
+    mp.move(pos_e, vel_e, Ng)
+    mp.move(pos_i, vel_i, Ng)
+
+    timer.task('Distribute')
+    rho = (qe/dx)*mp.distr(pos_e, Ng) + (qi/dx)*mp.distr(pos_i, Ng)
+
+    timer.task('Solve phi')
     phi = solver.solve(rho)
+
+    timer.task('Solve E')
     E = -mp.grad(phi, dx)
-    a = E*(q/m)*(dt**2/dx)
-    KE[n] = (dx/dt)**2*m*mp.accel(pos, vel, a)
-    rho -= np.average(rho)
+
+    timer.task('Accelerate')
+    a = E*(dt**2/dx)
+    KE_e[n] = (dx/dt)**2*me*mp.accel(pos_e, vel_e, (qe/me)*a)
+    KE_i[n] = (dx/dt)**2*mi*mp.accel(pos_i, vel_i, (qi/mi)*a)
+    # rho -= np.average(rho)
+
+    timer.task('Potential energy')
     PE[n] = 0.5*dx*sum(rho*phi)
 
+print(timer)
 
-plt.plot(KE, label='Kinetic Energy')
+
+plt.plot(KE_e, label='Kinetic Energy (electrons)')
+plt.plot(KE_i, label='Kinetic Energy (ions)')
 plt.plot(PE, label='Potential Energy')
-plt.plot(KE+PE, label='Total Energy')
+plt.plot(KE_e+KE_i+PE, label='Total Energy')
 plt.legend(loc='lower right')
 plt.show()
 
