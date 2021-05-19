@@ -80,7 +80,6 @@ def move(x, v, L):
 
 def distr(x, N):
     j = x.astype(int)
-    rho = np.zeros(N)
-    np.add.at(rho, j      , 1-(x-j))
-    np.add.at(rho, (j+1)%N, x-j)
+    rho  = np.bincount(j, 1-(x-j))
+    rho += np.bincount((j+1)%N, x-j)
     return rho
