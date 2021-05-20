@@ -27,8 +27,10 @@ qi *= mul
 mi *= mul
 solver = mp.Solver(Ng, dx)
 
-pos_e = np.linspace(0, Ng[0], Np, endpoint=False)
-pos_i = np.linspace(0, Ng[0], Np, endpoint=False)
+pos_e = np.zeros((Np,1))
+pos_i = np.zeros((Np,1))
+pos_e[:,0] = np.linspace(0, Ng[0], Np, endpoint=False)
+pos_i[:,0] = np.linspace(0, Ng[0], Np, endpoint=False)
 # pos = np.random.uniform(0, Ng, Np)
 pos_e = pos_e + 0.01*np.cos(2*np.pi*pos_e/Ng)
 pos_e %= Ng[0]

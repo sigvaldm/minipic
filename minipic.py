@@ -94,12 +94,12 @@ def nb_accel(xs, vs, a):
     b[:-1] = a
     b[-1] = a[0]
     energy = 0.
-    for i in range(len(xs)):
-        x = xs[i]
+    for p in nb.prange(xs.shape[0]):
+        x = xs[p,0]
         j = int(x)
         ai = (x-j)*b[j+1] + (1-x+j)*b[j]
-        energy += vs[i]*(vs[i]+ai)
-        vs[i] += ai
+        energy += vs[p,0]*(vs[p,0]+ai)
+        vs[p,0] += ai
     energy *= 0.5
     return energy
 
@@ -138,11 +138,13 @@ def move(x, v, L):
     x += v
     x %= L
 
-@nb.njit(fastmath=True, parallel=parallel)
+@nb.njit(fastmath=True, parallel=False)
 def nb_move(xs, vs, L):
-    for i in nb.prange(len(xs)):
-        xs[i] += vs[i]
-        xs[i] %= L
+    for p in nb.prange(xs.shape[0]):
+        # Unrolling this loop manually for 1D, 2D and 3D improve performance
+        # for d in nb.prange(xs.shape[1]):
+        xs[p,0] += vs[p,0]
+        xs[p,0] %= L
     # xs += vs
     # xs %= L
 
@@ -155,9 +157,8 @@ def distr(x, N):
 @nb.njit(fastmath=True, parallel=parallel)
 def nb_distr(xs, N):
     rho = np.zeros(N+1)
-    for i in nb.prange(len(xs)):
-        x = xs[i]
-    # for x in xs:
+    for p in nb.prange(len(xs)):
+        x = xs[p][0]
         j = int(x)
         rho[j] += 1-(x-j)
         rho[j+1] += x-j
