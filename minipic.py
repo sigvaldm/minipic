@@ -86,20 +86,105 @@ def accel(x, v, a):
     v += ai
     return energy
 
-@nb.njit(fastmath=True, parallel=parallel)
 def nb_accel(xs, vs, a):
+    dim = a.ndim-1
+    if dim == 3:
+        return nb_accel_3D(xs, vs, a)
+    elif dim == 2:
+        return nb_accel_2D(xs, vs, a)
+    else:
+        return nb_accel_1D(xs, vs, a)
+
+@nb.njit(fastmath=True, parallel=parallel)
+def nb_accel_3D(xs, vs, a):
     "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
-    N = len(a)
-    b = np.zeros(N+1)
-    b[:-1] = a
-    b[-1] = a[0]
+    N = a.shape
+    b = np.zeros((3,N[1]+1,N[2]+1,N[3]+1))
+    b[:,:-1,:-1,:-1] = a
+    b[:,-1,:,:] = b[:,0,:,:]
+    b[:,:,-1,:] = b[:,:,0,:]
+    b[:,:,:,-1] = b[:,:,:,0]
+
     energy = 0.
     for p in nb.prange(xs.shape[0]):
-        x = xs[p,0]
-        j = int(x)
-        ai = (x-j)*b[j+1] + (1-x+j)*b[j]
+
+        i = int(xs[p,0])
+        j = int(xs[p,1])
+        k = int(xs[p,2])
+        x = xs[p,0]-i
+        y = xs[p,1]-j
+        z = xs[p,2]-k
+        xc = 1-x
+        yc = 1-y
+        zc = 1-z
+
+        for d in nb.prange(3):
+            ai = zc*( yc*( xc*b[d,i,j,k]
+                          +x *b[d,i+1,j,k])
+                     +y *( xc*b[d,i,j+1,k]
+                          +x *b[d,i+1,j+1,k])) \
+                +z *( yc*( xc*b[d,i,j,k+1]
+                          +x *b[d,i+1,j,k+1])
+                     +y *( xc*b[d,i,j+1,k+1]
+                          +x *b[d,i+1,j+1,k+1]))
+
+            energy += vs[p,d]*(vs[p,d]+ai)
+            vs[p,d] += ai
+
+    energy *= 0.5
+    return energy
+
+@nb.njit(fastmath=True, parallel=parallel)
+def nb_accel_2D(xs, vs, a):
+    "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
+    N = a.shape
+    b = np.zeros((2,N[1]+1,N[2]+1))
+    b[:,:-1,:-1] = a
+    b[:,-1,:] = b[:,0,:]
+    b[:,:,-1] = b[:,:,0]
+
+    energy = 0.
+    for p in nb.prange(xs.shape[0]):
+
+        i = int(xs[p,0])
+        j = int(xs[p,1])
+        x = xs[p,0]-i
+        y = xs[p,1]-j
+        xc = 1-x
+        yc = 1-y
+
+        for d in nb.prange(2):
+            ai = yc*( xc*b[d,i,j]
+                     +x *b[d,i+1,j]) \
+                +y *( xc*b[d,i,j+1]
+                     +x *b[d,i+1,j+1])
+
+            energy += vs[p,d]*(vs[p,d]+ai)
+            vs[p,d] += ai
+
+    energy *= 0.5
+    return energy
+
+@nb.njit(fastmath=True, parallel=parallel)
+def nb_accel_1D(xs, vs, a):
+    "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
+    N = a.shape
+    b = np.zeros((1,N[1]+1))
+    b[:,:-1] = a
+    b[:,-1] = b[:,0]
+
+    energy = 0.
+    for p in nb.prange(xs.shape[0]):
+
+        i = int(xs[p,0])
+        x = xs[p,0]-i
+        xc = 1-x
+
+        ai = xc*b[0,i] + x*b[0,i+1]
+
         energy += vs[p,0]*(vs[p,0]+ai)
         vs[p,0] += ai
+
     energy *= 0.5
     return energy
 
@@ -140,13 +225,27 @@ def move(x, v, L):
 
 @nb.njit(fastmath=True, parallel=parallel)
 def nb_move(xs, vs, L):
-    for p in nb.prange(xs.shape[0]):
-        # Unrolling this loop manually for 1D, 2D and 3D improve performance
-        # for d in nb.prange(xs.shape[1]):
-        xs[p,0] += vs[p,0]
-        xs[p,0] %= L
+    # Unrolled loops perform better
     # xs += vs
     # xs %= L
+    if xs.shape[1]==3:
+        for p in nb.prange(xs.shape[0]):
+            xs[p,0] += vs[p,0]
+            xs[p,0] %= L[0]
+            xs[p,1] += vs[p,1]
+            xs[p,1] %= L[1]
+            xs[p,2] += vs[p,2]
+            xs[p,2] %= L[2]
+    elif xs.shape[1]==2:
+        for p in nb.prange(xs.shape[0]):
+            xs[p,0] += vs[p,0]
+            xs[p,0] %= L[0]
+            xs[p,1] += vs[p,1]
+            xs[p,1] %= L[1]
+    elif xs.shape[1]==1:
+        for p in nb.prange(xs.shape[0]):
+            xs[p,0] += vs[p,0]
+            xs[p,0] %= L[0]
 
 def distr(x, N):
     j = x.astype(int)
