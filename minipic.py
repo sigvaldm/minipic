@@ -138,7 +138,7 @@ def move(x, v, L):
     x += v
     x %= L
 
-@nb.njit(fastmath=True, parallel=False)
+@nb.njit(fastmath=True, parallel=parallel)
 def nb_move(xs, vs, L):
     for p in nb.prange(xs.shape[0]):
         # Unrolling this loop manually for 1D, 2D and 3D improve performance
@@ -154,13 +154,87 @@ def distr(x, N):
     rho += np.bincount((j+1)%N, x-j)
     return rho
 
-@nb.njit(fastmath=True, parallel=parallel)
 def nb_distr(xs, N):
-    rho = np.zeros(N+1)
+    if xs.shape[1] == 3:
+        return nb_distr_3D(xs, N)
+    elif xs.shape[1] == 2:
+        return nb_distr_2D(xs, N)
+    elif xs.shape[1] == 1:
+        return nb_distr_1D(xs, N)
+
+@nb.njit(fastmath=True, parallel=parallel)
+def nb_distr_3D(xs, N):
+
+    # Allocate an extra slab in each dimension for periodic contributions
+    rho = np.zeros((N[0]+1, N[1]+1, N[2]+1))
+
     for p in nb.prange(len(xs)):
-        x = xs[p][0]
-        j = int(x)
-        rho[j] += 1-(x-j)
-        rho[j+1] += x-j
+
+        i = int(xs[p,0])
+        j = int(xs[p,1])
+        k = int(xs[p,2])
+        x = xs[p,0]-i
+        y = xs[p,1]-j
+        z = xs[p,2]-k
+        xc = 1-x
+        yc = 1-y
+        zc = 1-z
+
+        rho[i  , j  , k  ] += xc * yc * zc
+        rho[i+1, j  , k  ] += x  * yc * zc
+        rho[i  , j+1, k  ] += xc * y  * zc
+        rho[i+1, j+1, k  ] += x  * y  * zc
+        rho[i  , j  , k+1] += xc * yc * z
+        rho[i+1, j  , k+1] += x  * yc * z
+        rho[i  , j+1, k+1] += xc * y  * z
+        rho[i+1, j+1, k+1] += x  * y  * z
+
+    # Wrap periodic contributions in place
+    rho[0,:,:] += rho[-1,:,:]
+    rho[:,0,:] += rho[:,-1,:]
+    rho[:,:,0] += rho[:,:,-1]
+    return rho[:-1,:-1,:-1]
+
+@nb.njit(fastmath=True, parallel=parallel)
+def nb_distr_2D(xs, N):
+
+    # Allocate an extra slab in each dimension for periodic contributions
+    rho = np.zeros((N[0]+1, N[1]+1))
+
+    for p in nb.prange(len(xs)):
+
+        i = int(xs[p,0])
+        j = int(xs[p,0])
+        x = xs[p,0]-i
+        y = xs[p,0]-j
+        xc = 1-x
+        yc = 1-y
+
+        rho[i  , j  ] += xc * yc
+        rho[i+1, j  ] += x  * yc
+        rho[i  , j+1] += xc * y
+        rho[i+1, j+1] += x  * y
+
+    # Wrap periodic contributions in place
+    rho[0,:] += rho[-1,:]
+    rho[:,0] += rho[:,-1]
+    return rho[:-1,:-1]
+
+@nb.njit(fastmath=True, parallel=parallel)
+def nb_distr_1D(xs, N):
+
+    # Allocate an extra slab in each dimension for periodic contributions
+    rho = np.zeros(N[0]+1)
+
+    for p in nb.prange(xs.shape[0]):
+
+        i = int(xs[p,0])
+        x = xs[p,0]-i
+        xc = 1-x
+
+        rho[i]   += xc
+        rho[i+1] += x
+
+    # Wrap periodic contributions in place
     rho[0] += rho[-1]
     return rho[:-1]

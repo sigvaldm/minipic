@@ -27,10 +27,8 @@ qi *= mul
 mi *= mul
 solver = mp.Solver(Ng, dx)
 
-pos_e = np.zeros((Np,1))
-pos_i = np.zeros((Np,1))
-pos_e[:,0] = np.linspace(0, Ng[0], Np, endpoint=False)
-pos_i[:,0] = np.linspace(0, Ng[0], Np, endpoint=False)
+pos_e = np.linspace(0, Ng[0], Np, endpoint=False).reshape((-1,1))
+pos_i = np.linspace(0, Ng[0], Np, endpoint=False).reshape((-1,1))
 # pos = np.random.uniform(0, Ng, Np)
 pos_e = pos_e + 0.01*np.cos(2*np.pi*pos_e/Ng)
 pos_e %= Ng[0]
@@ -45,7 +43,7 @@ KE_e = np.zeros(Nt)
 KE_e[0] = 0.5*me*sum(vel_e**2)
 KE_i[0] = 0.5*mi*sum(vel_i**2)
 
-rho = (qe/dx)*mp.nb_distr(pos_e, Ng[0]) + (qi/dx)*mp.nb_distr(pos_i, Ng[0])
+rho = (qe/dx)*mp.nb_distr(pos_e, Ng) + (qi/dx)*mp.nb_distr(pos_i, Ng)
 phi = solver.solve(rho)
 E = -mp.grad(phi, dx)[0]
 
@@ -69,7 +67,7 @@ for n in timer.iterate(range(1,Nt)):
     mp.nb_move(pos_i, vel_i, Ng[0])
 
     timer.task('Distribute')
-    rho = (qe/dx)*mp.nb_distr(pos_e, Ng[0]) + (qi/dx)*mp.nb_distr(pos_i, Ng[0])
+    rho = (qe/dx)*mp.nb_distr(pos_e, Ng) + (qi/dx)*mp.nb_distr(pos_i, Ng)
 
     timer.task('Poisson-solve')
     phi = solver.solve(rho)
