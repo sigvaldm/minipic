@@ -7,31 +7,37 @@ from tasktimer import TaskTimer
 " INITIAL CONDITIONS
 """
 
-Ng = np.array([32**3])
-Np = Ng[0]*64
+dim = 3
+Ng = np.array([128]*dim)
+Np = np.prod(Ng)*16
 
-Nt = 45
-dt = 0.2
-L = np.array([2*np.pi])
+T = 3*np.pi # Simulation time in periods
+dt = 0.05
+Nt = int(np.ceil(T/dt))
+L = np.array([2*np.pi]*len(Ng))
 dx = L/Ng
+dv = np.prod(dx)
 
-x = np.arange(0,L[0],dx[0])
 qe = -1.0
 qi = 1.0
 me = 1.0
-mi = 10.0
-mul = (L[0]/Np)*(me/qe**2)
+mi = 1000.0
+mul = (np.prod(L)/Np)*(me/qe**2)
 qe *= mul
 me *= mul
 qi *= mul
 mi *= mul
 solver = mp.Solver(Ng, dx)
 
-pos_e = np.linspace(0, Ng[0], Np, endpoint=False)
-pos_i = np.linspace(0, Ng[0], Np, endpoint=False)
-# pos = np.random.uniform(0, Ng, Np)
-pos_e = pos_e + 0.01*np.cos(2*np.pi*pos_e/Ng)
-pos_e %= Ng[0]
+pos_e = np.random.rand(Np, len(Ng))*Ng
+pos_i = np.random.rand(Np, len(Ng))*Ng
+pos_e[:,0] = np.linspace(0, Ng[0], Np, endpoint=False)
+pos_i[:,0] = np.linspace(0, Ng[0], Np, endpoint=False)
+# pos_e.sort()
+# pos_i.sort()
+pos_e[:,0] += 1e-5*np.cos(2*np.pi*pos_e[:,0]/Ng[0])
+pos_e[:,0] %= Ng[0]
+print(pos_e.shape)
 
 vel_e = np.zeros(pos_e.shape) # cold
 vel_i = np.zeros(pos_i.shape) # cold
@@ -40,19 +46,19 @@ vel_i = np.zeros(pos_i.shape) # cold
 PE = np.zeros(Nt)
 KE_i = np.zeros(Nt)
 KE_e = np.zeros(Nt)
-KE_e[0] = 0.5*me*sum(vel_e**2)
-KE_i[0] = 0.5*mi*sum(vel_i**2)
+KE_e[0] = 0.5*me*np.sum(vel_e**2)
+KE_i[0] = 0.5*mi*np.sum(vel_i**2)
 
-rho = (qe/dx)*mp.nb_distr(pos_e, Ng[0]) + (qi/dx)*mp.nb_distr(pos_i, Ng[0])
+rho = (qe/dv)*mp.nb_distr(pos_e, Ng) + (qi/dv)*mp.nb_distr(pos_i, Ng)
 phi = solver.solve(rho)
-E = -mp.grad(phi, dx)[0]
+E = -mp.grad(phi, dx)
 
 #
-a = E*(dt**2/dx)
+a = E*(dt**2/dx[0])
 mp.nb_accel(pos_e, vel_e, 0.5*(qe/me)*a)
 mp.nb_accel(pos_i, vel_i, 0.5*(qi/mi)*a)
 # rho -= np.average(rho)
-PE[0] = 0.5*dx*sum(rho*phi)
+PE[0] = 0.5*dv*np.sum(rho*phi)
 
 """
 " TIME LOOP
@@ -63,26 +69,26 @@ timer = TaskTimer()
 for n in timer.iterate(range(1,Nt)):
 
     timer.task('Move')
-    mp.nb_move(pos_e, vel_e, Ng[0])
-    mp.nb_move(pos_i, vel_i, Ng[0])
+    mp.nb_move(pos_e, vel_e, Ng)
+    mp.nb_move(pos_i, vel_i, Ng)
 
     timer.task('Distribute')
-    rho = (qe/dx)*mp.nb_distr(pos_e, Ng[0]) + (qi/dx)*mp.nb_distr(pos_i, Ng[0])
+    rho = (qe/dv)*mp.nb_distr(pos_e, Ng) + (qi/dv)*mp.nb_distr(pos_i, Ng)
 
     timer.task('Poisson-solve')
     phi = solver.solve(rho)
 
     timer.task('E-field gradient')
-    E = -mp.grad(phi, dx)[0]
+    E = -mp.grad(phi, dx)
 
     timer.task('Accelerate')
-    a = E*(dt**2/dx)
-    KE_e[n] = (dx/dt)**2*me*mp.nb_accel(pos_e, vel_e, (qe/me)*a)
-    KE_i[n] = (dx/dt)**2*mi*mp.nb_accel(pos_i, vel_i, (qi/mi)*a)
+    a = E*(dt**2/dx[0])
+    KE_e[n] = (dx[0]/dt)**2*me*mp.nb_accel(pos_e, vel_e, (qe/me)*a)
+    KE_i[n] = (dx[0]/dt)**2*mi*mp.nb_accel(pos_i, vel_i, (qi/mi)*a)
     # rho -= np.average(rho)
 
     timer.task('Potential energy')
-    PE[n] = 0.5*dx*sum(rho*phi)
+    PE[n] = 0.5*dv*np.sum(rho*phi)
 
 print(timer)
 
