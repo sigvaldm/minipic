@@ -59,9 +59,15 @@ E = np.zeros(E_size)
 
 timer = TaskTimer()
 
-for n in timer.iterate(range(1,Nt)):
+if rank==0:
+    wrap = timer.iterate
+else:
+    def wrap(x):
+        return x
 
-    timer.task('Distribute')
+for n in wrap(range(1,Nt)):
+
+    if rank==0: timer.task('Distribute')
     rho = (qe/dv)*mp.nb_distr(pos_e, Ng) + (qi/dv)*mp.nb_distr(pos_i, Ng)
 
     comm.Reduce(rho, rho_buff)
@@ -77,7 +83,7 @@ for n in timer.iterate(range(1,Nt)):
 
     comm.Bcast(E)
 
-    timer.task('Accelerate')
+    if rank==0: timer.task('Accelerate')
     a = E*(dt**2/dx[0])
     KE_e[n] = (dx[0]/dt)**2*me*mp.nb_accel(pos_e, vel_e, (qe/me)*a)
     KE_i[n] = (dx[0]/dt)**2*mi*mp.nb_accel(pos_i, vel_i, (qi/mi)*a)
@@ -87,12 +93,13 @@ for n in timer.iterate(range(1,Nt)):
         timer.task('Potential energy')
         PE[n] = 0.5*dv*np.sum(rho*phi)
 
-    timer.task('Move')
+    if rank==0: timer.task('Move')
     mp.nb_move(pos_e, vel_e, Ng)
     mp.nb_move(pos_i, vel_i, Ng)
 
 
-print(timer)
+if rank==0:
+    print(timer)
 
 KE_buff = np.zeros_like(KE_e)
 comm.Reduce(KE_e, KE_buff)
