@@ -1,9 +1,8 @@
 import numpy as np
-import matplotlib.pylab as plt
 import numba as nb
 from copy import deepcopy
 
-parallel=True
+parallel=False
 
 def make_grid(domain_size, num_cells, sparse=False):
 
@@ -36,14 +35,6 @@ class Solver:
         spectrum *= self.K_sq_inv
         phi = np.fft.irfftn(spectrum, rho.shape)
         return phi
-
-# def grad(phi, dx):
-#     E = np.zeros(phi.shape)
-#     E[0]    = phi[1]  - phi[-1]
-#     E[1:-1] = phi[2:] - phi[:-2]
-#     E[-1]   = phi[0]  - phi[-2]
-#     E /= 2*dx
-#     return E
 
 def grad(phi, dx):
     if len(phi.shape)==1:
@@ -80,8 +71,9 @@ def grad(phi, dx):
 
 def accel(x, v, a):
     "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
-    N = len(a)
-    ai = np.interp(x, np.arange(N), a, period=N)
+    x = x.ravel()
+    N = len(a[0])
+    ai = np.interp(x, np.arange(N), a[0], period=N).reshape(-1,1)
     energy = 0.5*np.sum(v*(v+ai))
     v += ai
     return energy
@@ -95,7 +87,7 @@ def nb_accel(xs, vs, a):
     else:
         return nb_accel_1D(xs, vs, a)
 
-@nb.njit(fastmath=True, parallel=parallel)
+@nb.njit(fastmath=True, parallel=parallel, cache=True)
 def nb_accel_3D(xs, vs, a):
     "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
     N = a.shape
@@ -134,7 +126,7 @@ def nb_accel_3D(xs, vs, a):
     energy *= 0.5
     return energy
 
-@nb.njit(fastmath=True, parallel=parallel)
+@nb.njit(fastmath=True, parallel=parallel, cache=True)
 def nb_accel_2D(xs, vs, a):
     "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
     N = a.shape
@@ -165,7 +157,7 @@ def nb_accel_2D(xs, vs, a):
     energy *= 0.5
     return energy
 
-@nb.njit(fastmath=True, parallel=parallel)
+@nb.njit(fastmath=True, parallel=parallel, cache=True)
 def nb_accel_1D(xs, vs, a):
     "Error O(dt^3) in pos and vel but only O(dt^2) in energy"
     N = a.shape
@@ -223,7 +215,7 @@ def move(x, v, L):
     x += v
     x %= L
 
-@nb.njit(fastmath=True, parallel=parallel)
+@nb.njit(fastmath=True, parallel=parallel, cache=True)
 def nb_move(xs, vs, L):
     # Unrolled loops perform better
     # xs += vs
@@ -248,6 +240,7 @@ def nb_move(xs, vs, L):
             xs[p,0] %= L[0]
 
 def distr(x, N):
+    x = x.ravel()
     j = x.astype(int)
     rho  = np.bincount(j, 1-(x-j))
     rho += np.bincount((j+1)%N, x-j)
@@ -261,7 +254,7 @@ def nb_distr(xs, N):
     elif xs.shape[1] == 1:
         return nb_distr_1D(xs, N)
 
-@nb.njit(fastmath=True, parallel=parallel)
+@nb.njit(fastmath=True, parallel=parallel, cache=True)
 def nb_distr_3D(xs, N):
 
     # Allocate an extra slab in each dimension for periodic contributions
@@ -295,7 +288,7 @@ def nb_distr_3D(xs, N):
     rho[:,:,0] += rho[:,:,-1]
     return rho[:-1,:-1,:-1]
 
-@nb.njit(fastmath=True, parallel=parallel)
+@nb.njit(fastmath=True, parallel=parallel, cache=True)
 def nb_distr_2D(xs, N):
 
     # Allocate an extra slab in each dimension for periodic contributions
@@ -321,7 +314,7 @@ def nb_distr_2D(xs, N):
     rho[:,0] += rho[:,-1]
     return rho[:-1,:-1]
 
-@nb.njit(fastmath=True, parallel=parallel)
+@nb.njit(fastmath=True, parallel=parallel, cache=True)
 def nb_distr_1D(xs, N):
 
     # Allocate an extra slab in each dimension for periodic contributions

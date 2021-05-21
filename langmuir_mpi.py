@@ -12,11 +12,10 @@ size = comm.Get_size()
 " INITIAL CONDITIONS
 """
 
-dim = 1
-Ng = np.array([4096]*dim)
-Np = np.prod(Ng)*8192
+Ng = np.array([32, 32])
+Np = np.prod(Ng)*64
 
-T = 3*np.pi # Simulation time in periods
+T = 3*np.pi
 dt = 0.05
 Nt = int(np.ceil(T/dt))
 L = np.array([2*np.pi]*len(Ng))
@@ -38,17 +37,11 @@ Np //= size
 
 pos_e = np.random.rand(Np, len(Ng))*Ng
 pos_i = np.random.rand(Np, len(Ng))*Ng
-pos_e[:,0] = np.linspace(0, Ng[0], Np, endpoint=False)
-pos_i[:,0] = np.linspace(0, Ng[0], Np, endpoint=False)
-# pos_e.sort()
-# pos_i.sort()
 pos_e[:,0] += 1e-5*np.cos(2*np.pi*pos_e[:,0]/Ng[0])
 pos_e[:,0] %= Ng[0]
-print(pos_e.shape)
 
-vel_e = np.zeros(pos_e.shape) # cold
-vel_i = np.zeros(pos_i.shape) # cold
-# vel = velTh * np.random.randn(Np) + velDrift # warm
+vel_e = np.zeros(pos_e.shape)
+vel_i = np.zeros(pos_i.shape)
 
 PE = np.zeros(Nt)
 KE_i = np.zeros(Nt)
@@ -56,18 +49,9 @@ KE_e = np.zeros(Nt)
 KE_e[0] = 0.5*me*np.sum(vel_e**2)
 KE_i[0] = 0.5*mi*np.sum(vel_i**2)
 
-rho = (qe/dv)*mp.nb_distr(pos_e, Ng) + (qi/dv)*mp.nb_distr(pos_i, Ng)
-phi = solver.solve(rho)
-E = -mp.grad(phi, dx)
-
-rho_buff = np.zeros_like(rho)
-
-#
-a = E*(dt**2/dx[0])
-mp.nb_accel(pos_e, vel_e, 0.5*(qe/me)*a)
-mp.nb_accel(pos_i, vel_i, 0.5*(qi/mi)*a)
-# rho -= np.average(rho)
-PE[0] = 0.5*dv*np.sum(rho*phi)
+rho_buff = np.zeros(Ng)
+E_size = np.concatenate([[len(Ng)], Ng])
+E = np.zeros(E_size)
 
 """
 " TIME LOOP
@@ -76,10 +60,6 @@ PE[0] = 0.5*dv*np.sum(rho*phi)
 timer = TaskTimer()
 
 for n in timer.iterate(range(1,Nt)):
-
-    timer.task('Move')
-    mp.nb_move(pos_e, vel_e, Ng)
-    mp.nb_move(pos_i, vel_i, Ng)
 
     timer.task('Distribute')
     rho = (qe/dv)*mp.nb_distr(pos_e, Ng) + (qi/dv)*mp.nb_distr(pos_i, Ng)
@@ -107,6 +87,11 @@ for n in timer.iterate(range(1,Nt)):
         timer.task('Potential energy')
         PE[n] = 0.5*dv*np.sum(rho*phi)
 
+    timer.task('Move')
+    mp.nb_move(pos_e, vel_e, Ng)
+    mp.nb_move(pos_i, vel_i, Ng)
+
+
 print(timer)
 
 KE_buff = np.zeros_like(KE_e)
@@ -124,9 +109,3 @@ if rank==0:
     plt.plot(KE_e+KE_i+PE, label='Total Energy')
     plt.legend(loc='lower right')
     plt.show()
-
-    # plt.plot(rho, label='rho')
-    # plt.plot(phi, label='phi')
-    # plt.plot(E, label='E')
-    # plt.legend(loc='upper right')
-    # plt.show()
