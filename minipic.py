@@ -3,7 +3,7 @@ import matplotlib.pylab as plt
 import numba as nb
 from copy import deepcopy
 
-parallel=False
+parallel=True
 
 def make_grid(domain_size, num_cells, sparse=False):
 
@@ -267,7 +267,8 @@ def nb_distr_3D(xs, N):
     # Allocate an extra slab in each dimension for periodic contributions
     rho = np.zeros((N[0]+1, N[1]+1, N[2]+1))
 
-    for p in nb.prange(len(xs)):
+    # Do not parallelize this loop
+    for p in range(len(xs)):
 
         i = int(xs[p,0])
         j = int(xs[p,1])
@@ -300,12 +301,13 @@ def nb_distr_2D(xs, N):
     # Allocate an extra slab in each dimension for periodic contributions
     rho = np.zeros((N[0]+1, N[1]+1))
 
-    for p in nb.prange(len(xs)):
+    # Do not parallelize this loop
+    for p in range(len(xs)):
 
         i = int(xs[p,0])
-        j = int(xs[p,0])
+        j = int(xs[p,1])
         x = xs[p,0]-i
-        y = xs[p,0]-j
+        y = xs[p,1]-j
         xc = 1-x
         yc = 1-y
 
@@ -325,7 +327,8 @@ def nb_distr_1D(xs, N):
     # Allocate an extra slab in each dimension for periodic contributions
     rho = np.zeros(N[0]+1)
 
-    for p in nb.prange(xs.shape[0]):
+    # Do not parallelize this loop
+    for p in range(xs.shape[0]):
 
         i = int(xs[p,0])
         x = xs[p,0]-i
