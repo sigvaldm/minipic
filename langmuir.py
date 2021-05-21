@@ -2,14 +2,19 @@ import minipic as mp
 import numpy as np
 import matplotlib.pylab as plt
 from tasktimer import TaskTimer
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
 """
 " INITIAL CONDITIONS
 """
 
-dim = 3
-Ng = np.array([128]*dim)
-Np = np.prod(Ng)*16
+dim = 1
+Ng = np.array([4096]*dim)
+Np = np.prod(Ng)*8192
 
 T = 3*np.pi # Simulation time in periods
 dt = 0.05
@@ -21,13 +26,15 @@ dv = np.prod(dx)
 qe = -1.0
 qi = 1.0
 me = 1.0
-mi = 1000.0
+mi = 10.0
 mul = (np.prod(L)/Np)*(me/qe**2)
 qe *= mul
 me *= mul
 qi *= mul
 mi *= mul
 solver = mp.Solver(Ng, dx)
+
+Np //= size
 
 pos_e = np.random.rand(Np, len(Ng))*Ng
 pos_i = np.random.rand(Np, len(Ng))*Ng
@@ -53,6 +60,8 @@ rho = (qe/dv)*mp.nb_distr(pos_e, Ng) + (qi/dv)*mp.nb_distr(pos_i, Ng)
 phi = solver.solve(rho)
 E = -mp.grad(phi, dx)
 
+rho_buff = np.zeros_like(rho)
+
 #
 a = E*(dt**2/dx[0])
 mp.nb_accel(pos_e, vel_e, 0.5*(qe/me)*a)
@@ -75,11 +84,18 @@ for n in timer.iterate(range(1,Nt)):
     timer.task('Distribute')
     rho = (qe/dv)*mp.nb_distr(pos_e, Ng) + (qi/dv)*mp.nb_distr(pos_i, Ng)
 
-    timer.task('Poisson-solve')
-    phi = solver.solve(rho)
+    comm.Reduce(rho, rho_buff)
+    rho = rho_buff
 
-    timer.task('E-field gradient')
-    E = -mp.grad(phi, dx)
+    if rank==0:
+
+        timer.task('Poisson-solve')
+        phi = solver.solve(rho)
+
+        timer.task('E-field gradient')
+        E = -mp.grad(phi, dx)
+
+    comm.Bcast(E)
 
     timer.task('Accelerate')
     a = E*(dt**2/dx[0])
@@ -87,21 +103,30 @@ for n in timer.iterate(range(1,Nt)):
     KE_i[n] = (dx[0]/dt)**2*mi*mp.nb_accel(pos_i, vel_i, (qi/mi)*a)
     # rho -= np.average(rho)
 
-    timer.task('Potential energy')
-    PE[n] = 0.5*dv*np.sum(rho*phi)
+    if rank==0:
+        timer.task('Potential energy')
+        PE[n] = 0.5*dv*np.sum(rho*phi)
 
 print(timer)
 
+KE_buff = np.zeros_like(KE_e)
+comm.Reduce(KE_e, KE_buff)
+KE_e = KE_buff
+KE_buff = np.zeros_like(KE_e)
+comm.Reduce(KE_i, KE_buff)
+KE_i = KE_buff
 
-plt.plot(KE_e, label='Kinetic Energy (electrons)')
-plt.plot(KE_i, label='Kinetic Energy (ions)')
-plt.plot(PE, label='Potential Energy')
-plt.plot(KE_e+KE_i+PE, label='Total Energy')
-plt.legend(loc='lower right')
-plt.show()
+if rank==0:
 
-# plt.plot(rho, label='rho')
-# plt.plot(phi, label='phi')
-# plt.plot(E, label='E')
-# plt.legend(loc='upper right')
-# plt.show()
+    plt.plot(KE_e, label='Kinetic Energy (electrons)')
+    plt.plot(KE_i, label='Kinetic Energy (ions)')
+    plt.plot(PE, label='Potential Energy')
+    plt.plot(KE_e+KE_i+PE, label='Total Energy')
+    plt.legend(loc='lower right')
+    plt.show()
+
+    # plt.plot(rho, label='rho')
+    # plt.plot(phi, label='phi')
+    # plt.plot(E, label='E')
+    # plt.legend(loc='upper right')
+    # plt.show()
